@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 702ce972c320efe4a990e084424fa67a, type: 3}
+  m_Name: HellData
+  m_EditorClassIdentifier: Assembly-CSharp::WorkerData
+  workerName: "\u0425\u044D\u043B\u043B"
+  phoneNumber: 666
+  handledTag: hell
+  assignedFloors: 000000000100000002000000
+  cooldownTime: 20
