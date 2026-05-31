@@ -1,23 +1,19 @@
 using UnityEngine;
-using UnityEngine.Events;
+using OfficeGame;
 
 /// <summary>
 /// Центральный менеджер игры.
-/// Управляет сложностью, игровым временем,
-/// состоянием паузы, победой и поражением.
+/// Хранит состояние (запущена/пауза/конец), считает игровое время,
+/// вызывает победу и поражение.
 /// </summary>
 public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
-
-    public enum Difficulty { Easy, Normal, Hard }
-    public Difficulty CurrentDifficulty { get; private set; } = Difficulty.Normal;
-
-    public bool IsDifficultyLocked => _sessionStarted;
-
+    public bool IsGameRunning { get; private set; } = false;
+    public bool IsPaused { get; private set; } = false;
 
     [Header("Время игры")]
-    [Tooltip("Реальная продолжительность сессии в секундах (600 = 10 минут)")]
+    [Tooltip("Реальная продолжительность сессии в секундах")]
     public float sessionDurationSeconds = 600f;
 
     [Tooltip("Начальный игровой час (9 = 09:00)")]
@@ -26,10 +22,6 @@ public class GameManager : MonoBehaviour
     [Tooltip("Конечный игровой час (18 = 18:00)")]
     public int gameEndHour = 18;
 
-    public bool IsGameRunning { get; private set; } = false;
-    public bool IsPaused { get; private set; } = false;
-
-    private bool _sessionStarted = false;
     private bool _gameOver = false;
     private float _elapsed = 0f;
     public float SessionProgress => Mathf.Clamp01(_elapsed / sessionDurationSeconds);
@@ -49,11 +41,10 @@ public class GameManager : MonoBehaviour
         Instance = this;
     }
 
-    private void Start()
-    {
-        Time.timeScale = 0f;
-    }
-
+    /// <summary>
+    /// Каждый кадр увеличивает игровое время.
+    /// Когда время вышло — вызывает победу.
+    /// </summary>
     private void Update()
     {
         if (!IsGameRunning || _gameOver) return;
@@ -68,26 +59,30 @@ public class GameManager : MonoBehaviour
     {
         if (_gameOver) ResetSession();
 
-        _sessionStarted = true;
         _gameOver = false;
         IsGameRunning = true;
         IsPaused = false;
         Time.timeScale = 1f;
 
-        Debug.Log($"[GameManager] Игра запущена. Сложность: {CurrentDifficulty}");
+        var diff = GameDifficulty.Current?.level.ToString() ?? "Unknown";
+        Debug.Log($"[GameManager] Игра запущена. Сложность: {diff}");
     }
+
     public void PauseGame()
     {
         if (!IsGameRunning) return;
+
         IsGameRunning = false;
         IsPaused = true;
 
         FindAnyObjectByType<CameraWaypointController>()?.OnPause();
         Debug.Log("[GameManager] Пауза");
     }
+
     public void ResumeGame()
     {
         if (!IsPaused) return;
+
         IsGameRunning = true;
         IsPaused = false;
 
@@ -95,55 +90,73 @@ public class GameManager : MonoBehaviour
         Debug.Log("[GameManager] Игра возобновлена");
     }
 
-    public bool SetDifficulty(Difficulty diff)
-    {
-        if (IsDifficultyLocked)
-        {
-            Debug.LogWarning("[GameManager] Нельзя менять сложность во время игры.");
-            return false;
-        }
-        CurrentDifficulty = diff;
-        Debug.Log($"[GameManager] Сложность: {diff}");
-        return true;
-    }
-
     public void TriggerVictory()
     {
         if (_gameOver) return;
-        _gameOver = true; IsGameRunning = false;
+
+        _gameOver = true;
+        IsGameRunning = false;
         Debug.Log("[GameManager] ПОБЕДА!");
-        ReturnToMenu();
+        ReturnToMenu(isVictory: true);
     }
 
     public void TriggerDefeat()
     {
         if (_gameOver) return;
-        _gameOver = true; IsGameRunning = false;
+
+        _gameOver = true;
+        IsGameRunning = false;
         Debug.Log("[GameManager] ПОРАЖЕНИЕ!");
-        ReturnToMenu();
+        ReturnToMenu(isVictory: false);
     }
 
     /// <summary>
-    /// Возвращает камеру в главное меню и сбрасывает состояние кнопок телевизора.
+    /// Возвращает камеру в главное меню и показывает экран результата.
+    /// Вызывается из TriggerVictory и TriggerDefeat.
     /// </summary>
-    public void ReturnToMenu()
+    public void ReturnToMenu(bool isVictory)
     {
         Time.timeScale = 1f;
-        var cam = FindAnyObjectByType<CameraWaypointController>();
-        if (cam != null)
+
+        // Выключаем все события на этажах и сбрасываем рандомайзер
+        var randomizer = FindAnyObjectByType<ObjectRandomizer>();
+        if (randomizer != null)
         {
-            cam.ForceReturnToMenu();
+            randomizer.DisableAll();
+            randomizer.ResetState();
         }
 
-        TVMenuController.Instance?.ResetToInitialState();
+        FindAnyObjectByType<CameraWaypointController>()?.ForceReturnToMenu();
+        TVMenuController.Instance?.ResetToInitialState(isVictory);
 
         ResetSession();
         Debug.Log("[GameManager] Возврат в главное меню.");
+    }
+
+    /// <summary>
+    /// Возвращает в главное меню без показа экрана результата.
+    /// Используется при нажатии "Выход" во время паузы.
+    /// </summary>
+    public void ReturnToMenuClean()
+    {
+        if (_gameOver) return;
+
+        _gameOver = true;
+        IsGameRunning = false;
+        Time.timeScale = 1f;
+
+        var randomizer = FindAnyObjectByType<ObjectRandomizer>();
+        if (randomizer != null) { randomizer.DisableAll(); randomizer.ResetState(); }
+
+        FindAnyObjectByType<CameraWaypointController>()?.ForceReturnToMenu();
+        TVMenuController.Instance?.ResetToInitialState(showResult: false);
+
+        ResetSession();
+        Debug.Log("[GameManager] Выход в главное меню.");
     }
     private void ResetSession()
     {
         _elapsed = 0f;
         _gameOver = false;
-        _sessionStarted = false;
     }
 }

@@ -1,8 +1,10 @@
 using UnityEngine;
 
 /// <summary>
-/// Отслеживает, какой этаж сейчас просматривается на камерах,
-/// и сообщает FloorMoodSystem — тот зажигает жёлтую лампочку этажа.
+/// Мост между SurveillanceCameraSystem и FloorMoodSystem.
+/// Отслеживает текущий просматриваемый этаж и уведомляет FloorMoodSystem
+/// чтобы тот зажёг жёлтую лампочку нужного этажа.
+/// Требует SurveillanceCameraSystem на том же GameObject.
 /// </summary>
 [RequireComponent(typeof(SurveillanceCameraSystem))]
 public class CameraFloorBridge : MonoBehaviour
@@ -15,12 +17,21 @@ public class CameraFloorBridge : MonoBehaviour
         _camSystem = GetComponent<SurveillanceCameraSystem>();
     }
 
+    /// <summary>
+    /// Ждёт один кадр перед первым уведомлением.
+    /// Нужно чтобы все FloorMoodSystem.Start() успели выполниться
+    /// и инициализировать материалы лампочек.
+    /// </summary>
     private System.Collections.IEnumerator Start()
     {
         yield return null;
         NotifyFloorChanged(0);
     }
 
+    /// <summary>
+    /// Каждый кадр проверяет не сменился ли текущий этаж.
+    /// Если сменился — вызывает NotifyFloorChanged.
+    /// </summary>
     private void Update()
     {
         int floor = _camSystem != null ? _camSystem.CurrentFloorIndex : 0;
@@ -28,6 +39,12 @@ public class CameraFloorBridge : MonoBehaviour
         if (floor != _lastFloorIndex)
             NotifyFloorChanged(floor);
     }
+
+    /// <summary>
+    /// Уведомляет все FloorMoodSystem о смене просматриваемого этажа.
+    /// Нужный этаж зажигает жёлтую лампочку, остальные гасятся.
+    /// Также вызывается напрямую из SurveillanceCameraSystem.SwitchToFloor().
+    /// </summary>
     public void NotifyFloorChanged(int floorIndex)
     {
         _lastFloorIndex = floorIndex;
@@ -37,5 +54,4 @@ public class CameraFloorBridge : MonoBehaviour
 
         Debug.Log($"[CameraFloorBridge] Просматривается этаж {floorIndex}");
     }
-
 }

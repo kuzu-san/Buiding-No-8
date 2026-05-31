@@ -12,4 +12,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b5d7596c5f5581c49b8b70b658c3fe14, type: 3}
   m_Name: GameDifficulty
   m_EditorClassIdentifier: Assembly-CSharp::OfficeGame.GameDifficulty
-  level: 1
+  level: 2

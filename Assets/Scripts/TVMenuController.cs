@@ -18,13 +18,24 @@ public class TVMenuController : MonoBehaviour
     public int gameplayWaypointIndex = 1;
 
     [Header("Сложность")]
-    [Tooltip("Перетащите сюда ассет GameDifficulty из папки Assets")]
     public GameDifficulty difficultyAsset;
 
     [Header("Панели")]
     public GameObject panelMain;
     public GameObject panelDifficulty;
+    public GameObject panelResult;
 
+    [Header("Панель результата")]
+    public TMP_Text textResultTitle;
+    public Button btnBackToMenu;
+
+    [Tooltip("Текст и цвет при победе")]
+    public string victoryText = "ПОБЕДА!";
+    public Color victoryColor = new Color(0.2f, 1f, 0.3f);   // зелёный
+
+    [Tooltip("Текст и цвет при поражении")]
+    public string defeatText = "ПОРАЖЕНИЕ";
+    public Color defeatColor = new Color(1f, 0.2f, 0.2f);    // красный
 
     [Header("Главное меню")]
     public Button btnStart;
@@ -40,13 +51,13 @@ public class TVMenuController : MonoBehaviour
     public Button btnBack;
 
     [Header("Цвета выбора сложности")]
-    public Color colorSelected = new Color(1f, 0.85f, 0.2f);
-    public Color colorUnselected = new Color(1f, 1f, 1f);
+    public Color colorSelected = new Color(1f, 0.85f, 0.2f);   // жёлтый
+    public Color colorUnselected = new Color(0.3f, 0.3f, 0.3f);   // серый
 
     private bool _gameEverStarted = false;
     private bool _isPaused = false;
 
-    private enum Panel { Main, Difficulty }
+    private enum Panel { Main, Difficulty, Result }
 
     private void Awake()
     {
@@ -79,6 +90,8 @@ public class TVMenuController : MonoBehaviour
         btnNormal?.onClick.AddListener(() => SelectDifficulty(GameDifficulty.Level.Normal));
         btnHard?.onClick.AddListener(() => SelectDifficulty(GameDifficulty.Level.Hard));
         btnBack?.onClick.AddListener(() => ShowPanel(Panel.Main));
+
+        btnBackToMenu?.onClick.AddListener(OnBackToMenuClicked);
     }
 
     private void OnStartClicked()
@@ -89,11 +102,13 @@ public class TVMenuController : MonoBehaviour
         }
         else if (!_gameEverStarted)
         {
+            // Первый старт
             _gameEverStarted = true;
             SetStartButtonLabel(true);
             cameraController?.StartFromMenu(gameplayWaypointIndex);
             StartCoroutine(LaunchGameAfterTransition());
         }
+        // Если игра запущена и не на паузе — кнопка не должна быть доступна
     }
 
     private void OnDifficultyClicked()
@@ -110,12 +125,20 @@ public class TVMenuController : MonoBehaviour
 
     private void OnQuitClicked()
     {
+        if (_isPaused)
+        {
+            GameManager.Instance?.ReturnToMenuClean();
+            return;
+        }
+
 #if UNITY_EDITOR
         UnityEditor.EditorApplication.isPlaying = false;
 #else
         Application.Quit();
 #endif
     }
+
+    // Кнопки сложности
 
     private void SelectDifficulty(GameDifficulty.Level level)
     {
@@ -125,16 +148,17 @@ public class TVMenuController : MonoBehaviour
         RefreshDiffHighlight();
         Debug.Log($"[TVMenu] Сложность: {level}");
     }
+
     /// <summary>
-    /// Вызвать когда игра ставится на паузу.
+    /// Вызвать когда игра ставится на паузу (Escape).
     /// Переименовывает кнопку и блокирует сложность визуально.
     /// </summary>
     public void NotifyPaused()
     {
         _isPaused = true;
         ShowPanel(Panel.Main);
-        SetStartButtonLabel(true);
-        SetDiffButtonLocked(true);
+        SetStartButtonLabel(true);      // показываем "Продолжить"
+        SetDiffButtonLocked(true);      // серим кнопку сложности
     }
 
     /// <summary>
@@ -145,10 +169,36 @@ public class TVMenuController : MonoBehaviour
         _isPaused = false;
         SetDiffButtonLocked(_gameEverStarted);
     }
+
     private void ShowPanel(Panel panel)
     {
         if (panelMain) panelMain.SetActive(panel == Panel.Main);
         if (panelDifficulty) panelDifficulty.SetActive(panel == Panel.Difficulty);
+        if (panelResult) panelResult.SetActive(panel == Panel.Result);
+    }
+
+    /// <summary>
+    /// Показывает панель результата с нужным текстом и цветом.
+    /// </summary>
+    public void ShowResult(bool isVictory)
+    {
+        Debug.Log($"[TVMenu] ShowResult: isVictory = {isVictory}");
+        ShowPanel(Panel.Result);
+
+        if (textResultTitle != null)
+        {
+            textResultTitle.text = isVictory ? victoryText : defeatText;
+            textResultTitle.color = isVictory ? victoryColor : defeatColor;
+        }
+    }
+
+    /// <summary>Кнопка "Вернуться в главное меню" на панели результата.</summary>
+    private void OnBackToMenuClicked()
+    {
+        ShowPanel(Panel.Main);
+        SetStartButtonLabel(false);
+        SetDiffButtonLocked(false);
+        RefreshDiffHighlight();
     }
 
     /// <summary>Подсвечивает кнопку текущей сложности.</summary>
@@ -183,18 +233,22 @@ public class TVMenuController : MonoBehaviour
     }
 
     /// <summary>
-    /// Сбрасывает меню в исходное состояние как при первом запуске игры.
-    /// Вызывается при победе или поражении.
+    /// Сбрасывает меню в начальное состояние.
+    /// showResult: false = сразу главное меню без экрана результата (выход во время паузы).
     /// </summary>
-    public void ResetToInitialState()
+    public void ResetToInitialState(bool isVictory = false, bool showResult = true)
     {
         _gameEverStarted = false;
         _isPaused = false;
 
-        ShowPanel(Panel.Main);
         SetStartButtonLabel(false);
         SetDiffButtonLocked(false);
         RefreshDiffHighlight();
+
+        if (showResult)
+            ShowResult(isVictory);
+        else
+            ShowPanel(Panel.Main);
     }
     private IEnumerator FlashRed(Button btn)
     {

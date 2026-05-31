@@ -1,6 +1,6 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using OfficeGame;
 
 /// <summary>
 /// Активирует случайный объект из группы по тегу через заданный интервал.
@@ -58,6 +58,7 @@ public class ObjectRandomizer : MonoBehaviour
 
     private void Start()
     {
+        // Собираем все объекты по тегам и выключаем их
         foreach (var group in groups)
         {
             GameObject[] found = GameObject.FindGameObjectsWithTag(group.tag);
@@ -66,6 +67,7 @@ public class ObjectRandomizer : MonoBehaviour
             foreach (var obj in group.objects)
                 obj.SetActive(false);
 
+            // Немного разносим таймеры, чтобы не стрелять всё разом в 0
             group.timer = Random.Range(0f, group.interval);
 
             if (showDebugLogs)
@@ -84,6 +86,7 @@ public class ObjectRandomizer : MonoBehaviour
 
             _started = true;
 
+            // Сбрасываем таймеры групп, чтобы отсчёт начался с момента разблокировки
             foreach (var group in groups)
                 group.timer = Random.Range(0f, group.interval);
 
@@ -97,7 +100,8 @@ public class ObjectRandomizer : MonoBehaviour
 
             group.timer += Time.deltaTime;
 
-            if (group.timer >= group.interval)
+            float intervalMult = GameDifficulty.Current?.EventIntervalMultiplier ?? 1f;
+            if (group.timer >= group.interval * intervalMult)
             {
                 group.timer = 0f;
                 TryActivate(group);
@@ -109,7 +113,7 @@ public class ObjectRandomizer : MonoBehaviour
     {
         float roll = Random.value;
 
-        if (roll < group.activationChance)
+        if (roll > group.activationChance)
         {
             if (group.disableOnMiss && group.currentActive != null)
             {
@@ -117,11 +121,11 @@ public class ObjectRandomizer : MonoBehaviour
                 group.currentActive = null;
 
                 if (showDebugLogs)
-                    Debug.Log($"[ObjectRandomizer] {group.groupName}: шанс не выпал ({roll:F2} < {group.activationChance:F2}), объект выключен");
+                    Debug.Log($"[ObjectRandomizer] {group.groupName}: шанс не выпал ({roll:F2} > {group.activationChance:F2}), объект выключен");
             }
             else if (showDebugLogs)
             {
-                Debug.Log($"[ObjectRandomizer] {group.groupName}: шанс не выпал ({roll:F2} < {group.activationChance:F2})");
+                Debug.Log($"[ObjectRandomizer] {group.groupName}: шанс не выпал ({roll:F2} > {group.activationChance:F2})");
             }
 
             return;
@@ -141,5 +145,29 @@ public class ObjectRandomizer : MonoBehaviour
 
         if (showDebugLogs)
             Debug.Log($"[ObjectRandomizer] {group.groupName}: активирован «{chosen.name}» (roll={roll:F2}, шанс={group.activationChance:F2})");
+    }
+
+    /// <summary>Выключить все объекты во всех группах.</summary>
+    public void DisableAll()
+    {
+        foreach (var group in groups)
+        {
+            foreach (var obj in group.objects)
+                obj.SetActive(false);
+            group.currentActive = null;
+        }
+    }
+
+    /// <summary>
+    /// Сбрасывает таймеры и флаг старта.
+    /// Вызывается GameManager при окончании игры — следующий запуск начнётся с нуля.
+    /// </summary>
+    public void ResetState()
+    {
+        _started = false;
+        _globalTimer = 0f;
+
+        foreach (var group in groups)
+            group.timer = 0f;
     }
 }

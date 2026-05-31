@@ -1,15 +1,17 @@
 using System.Collections.Generic;
 using UnityEngine;
+using OfficeGame;
 
 /// <summary>
 /// Центральный реестр работников.
-/// Тикает кулдауны, предоставляет поиск по номеру телефона.
+/// Тикает кулдауны каждый кадр и предоставляет поиск работника по номеру телефона.
 /// </summary>
 public class WorkerManager : MonoBehaviour
 {
     public static WorkerManager Instance { get; private set; }
 
     [Header("Работники")]
+    [Tooltip("Все WorkerData ScriptableObject'ы проекта")]
     public List<WorkerData> workers = new List<WorkerData>();
 
     private void Awake()
@@ -18,11 +20,20 @@ public class WorkerManager : MonoBehaviour
         Instance = this;
     }
 
+    /// <summary>
+    /// Каждый кадр уменьшает оставшийся кулдаун каждого работника.
+    /// Когда кулдаун достигает 0 — WorkerData.IsOnCooldown становится false.
+    /// </summary>
     private void Update()
     {
         foreach (var w in workers)
             w.TickCooldown(Time.deltaTime);
     }
+
+    /// <summary>
+    /// Ищет работника по номеру телефона.
+    /// Возвращает null если работник с таким номером не найден.
+    /// </summary>
     public WorkerData FindByNumber(string number)
     {
         foreach (var w in workers)
@@ -31,8 +42,9 @@ public class WorkerManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Отправить работника на этаж: убирает все активные объекты его тега на этаже,
-    /// затем ставит его на кулдаун.
+    /// Отправляет работника на указанный этаж.
+    /// Выключает все активные объекты с его тегом на этаже, затем ставит на кулдаун.
+    /// Возвращает false если работник недоступен, не обслуживает этаж, или этаж не найден.
     /// </summary>
     public bool DispatchWorker(WorkerData worker, int floorIndex)
     {
@@ -48,6 +60,7 @@ public class WorkerManager : MonoBehaviour
             return false;
         }
 
+        // Ищем FloorMoodSystem нужного этажа
         FloorMoodSystem floor = null;
         foreach (var f in FloorMoodSystem.AllFloors)
         {
@@ -60,6 +73,7 @@ public class WorkerManager : MonoBehaviour
             return false;
         }
 
+        // Выключаем все активные объекты тега работника на этом этаже
         List<GameObject> targets = floor.GetObjectsByTag(worker.handledTag);
         int removed = 0;
         foreach (var obj in targets)
@@ -71,9 +85,12 @@ public class WorkerManager : MonoBehaviour
             }
         }
 
+        // Ставим работника на кулдаун
         worker.StartCooldown();
 
-        Debug.Log($"[WorkerManager] {worker.workerName} убрал {removed} объектов (тег «{worker.handledTag}») на этаже {floorIndex}. Кулдаун: {worker.cooldownTime}с");
+        Debug.Log($"[WorkerManager] {worker.workerName} убрал {removed} объектов " +
+                  $"(тег «{worker.handledTag}») на этаже {floorIndex}. " +
+                  $"Кулдаун: {worker.CooldownRemaining:F0}с");
         return true;
     }
 }
