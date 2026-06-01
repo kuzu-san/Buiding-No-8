@@ -156,7 +156,8 @@ public class CameraWaypointController : MonoBehaviour
 
         _ispaused = false;
         Time.timeScale = 1f;
-        GoToWaypoint(_indexBeforePause);
+        ApplyWaypointInstant(waypoints[_indexBeforePause]);
+        //GoToWaypoint(_indexBeforePause);
         TVMenuController.Instance?.NotifyResumed();
     }
 
